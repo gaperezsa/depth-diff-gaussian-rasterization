@@ -272,7 +272,8 @@ renderCUDA(
 	uint32_t* __restrict__ n_contrib,
 	const float* __restrict__ bg_color,
 	float* __restrict__ out_color,
-	float* __restrict__ out_depth)
+	float* __restrict__ out_depth,
+	uint32_t* __restrict__ out_gaussian_idx)
 {
 	// Identify current tile and associated min/max pixel range.
 	auto block = cg::this_thread_block();
@@ -304,6 +305,8 @@ renderCUDA(
 	uint32_t last_contributor = 0;
 	float C[CHANNELS] = { 0 };
 	float D = { 0 };
+	float max_contrib = 0.0f;
+	uint32_t max_contrib_gaussian_id = 0;
 
 	// Iterate over batches until all done or range is complete
 	for (int i = 0; i < rounds; i++, toDo -= BLOCK_SIZE)
@@ -354,9 +357,15 @@ renderCUDA(
 			}
 
 			// Eq. (3) from 3D Gaussian splatting paper.
+			float contribution = alpha * T;
 			for (int ch = 0; ch < CHANNELS; ch++)
-				C[ch] += features[collected_id[j] * CHANNELS + ch] * alpha * T;
-			D += depths[collected_id[j]] * alpha * T;
+				C[ch] += features[collected_id[j] * CHANNELS + ch] * contribution;
+			D += depths[collected_id[j]] * contribution;
+
+			if (contribution > max_contrib) {
+				max_contrib = contribution;
+				max_contrib_gaussian_id = collected_id[j];
+			}
 
 			T = test_T;
 
@@ -375,6 +384,7 @@ renderCUDA(
 		for (int ch = 0; ch < CHANNELS; ch++)
 			out_color[ch * H * W + pix_id] = C[ch] + T * bg_color[ch];
 		out_depth[pix_id] = D;
+		out_gaussian_idx[pix_id] = max_contrib_gaussian_id;
 	}
 }
 
@@ -391,7 +401,8 @@ void FORWARD::render(
 	uint32_t* n_contrib,
 	const float* bg_color,
 	float* out_color,
-	float* out_depth)
+	float* out_depth,
+	uint32_t* out_gaussian_idx)
 {
 	renderCUDA<NUM_CHANNELS> << <grid, block >> > (
 		ranges,
@@ -405,7 +416,8 @@ void FORWARD::render(
 		n_contrib,
 		bg_color,
 		out_color,
-		out_depth);
+		out_depth,
+		out_gaussian_idx);
 }
 
 void FORWARD::preprocess(int P, int D, int M,
