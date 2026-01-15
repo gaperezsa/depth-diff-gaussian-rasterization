@@ -218,7 +218,8 @@ int CudaRasterizer::Rasterizer::forward(
 	float* out_color,
 	float* out_depth,
 	int* radii,
-	bool debug)
+	bool debug,
+	uint32_t* out_gaussian_idx)
 {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
@@ -333,7 +334,8 @@ int CudaRasterizer::Rasterizer::forward(
 		imgState.n_contrib,
 		background,
 		out_color,
-		out_depth), debug)
+		out_depth,
+		out_gaussian_idx), debug)
 
 	return num_rendered;
 }

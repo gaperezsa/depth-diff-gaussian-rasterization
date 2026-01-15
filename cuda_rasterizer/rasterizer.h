@@ -51,7 +51,8 @@ namespace CudaRasterizer
 			float* out_color,
 			float* out_depth,
 			int* radii = nullptr,
-			bool debug = false);
+			bool debug = false,
+			uint32_t* out_gaussian_idx = nullptr);
 
 		static void backward(
 			const int P, int D, int M, int R,
